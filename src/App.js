@@ -1,7 +1,7 @@
 import logo from './logo.svg';
 import './App.css';
 import { useState, useEffect } from 'react';
-import { CookiesProvider, useCookies } from 'react-cookie';
+import { useCookies } from 'react-cookie';
 
 export const useMediaPermission = (type = 'camera') => {
   const [status, setStatus] = useState('prompt');
@@ -38,12 +38,60 @@ export const useMediaPermission = (type = 'camera') => {
 function App() {
   const mic = useMediaPermission('microphone');
   const cam = useMediaPermission('camera');
-  const [cookies, setCookie] = useCookies(['test']);
+  const [cookies, setCookie, removeCookie] = useCookies(['name']);
   
+  const [ipAddress, setIpAddress] = useState('');
+
+    useEffect(() => {
+      const getLocalIP = async () => {
+        const ipSet = new Set();
+  
+        const pc = new RTCPeerConnection({
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        });
+  
+        pc.createDataChannel(''); // needed to trigger ICE gathering
+  
+        pc.onicecandidate = (event) => {
+          if (event.candidate) {
+            const candidate = event.candidate.candidate;
+            const ipRegex = /([0-9]{1,3}(\.[0-9]{1,3}){3})/;
+            const match = ipRegex.exec(candidate);
+            if (match) {
+              ipSet.add(match[1]);
+              console.log('Found IP:', match[1]);
+              setIpAddress(match[1]);
+            }
+          }
+        };
+  
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+        } catch (err) {
+          console.error('Error creating offer:', err);
+        }
+  
+        // Wait for ICE gathering
+        setTimeout(() => {
+          pc.close();
+          console.log('All gathered IPs:', [...ipSet]);
+        }, 1000); // Wait a bit to gather all ICE candidates
+      };
+  
+      getLocalIP();
+    }, []);
+
 
   return (
     <div style={{ padding: 20, fontFamily: 'Arial' }}>
-      <h1>Media Permissions Checker</h1>
+      <h1>IP gathered using WebRTC</h1>
+
+      <div>
+        <h2> IP Address found:</h2>
+        <p> {ipAddress} </p>
+      </div>
+      <h1>Media Permissions Test</h1>
 
       <div>
         <h2>Microphone</h2>
@@ -60,7 +108,7 @@ function App() {
       <div style={{ marginTop: 20 }}>
         <h2>Cookie</h2>
         <p>Status: {cookies.name}</p>
-        <button onClick={setCookie('test', 'true')}>SetCookie</button>
+        <button onClick={setCookie('name', 'cookie set')}>SetCookie</button>
       </div>
     </div>
   );
